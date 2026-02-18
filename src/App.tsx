@@ -6,6 +6,9 @@ import PokemonDetail from './pages/PokemonDetail'
 import WhosThatPokemon from './pages/WhosThatPokemon'
 import Quiz from './pages/Quiz'
 import TeamBuilder from './pages/TeamBuilder'
+import Login from './pages/Login'
+import MesEquipes from './pages/MesEquipes'
+import ProtectedRoute from './components/ProtectedRoute'
 
 function App() {
   return (
@@ -18,6 +21,8 @@ function App() {
         <Route path="/whos-that-pokemon" element={<WhosThatPokemon />} />
         <Route path="/quiz" element={<Quiz />} />
         <Route path="/team-builder" element={<TeamBuilder />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/mes-equipes" element={<ProtectedRoute><MesEquipes /></ProtectedRoute>} />
       </Routes>
     </>
   )

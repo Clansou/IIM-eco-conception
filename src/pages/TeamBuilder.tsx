@@ -1,10 +1,13 @@
 import { useState, useEffect } from 'react'
+import { useSearchParams, useNavigate } from 'react-router-dom'
 import { Pokemon, TypeName } from '../types/pokemon'
-import { getAllPokemonAllGens, getPokemonByGeneration, getPokemonImage, Generation, generations } from '../utils/api'
-import { typeColors, typeFrenchNames } from '../utils/typeColors'
+import { getAllPokemonAllGens, getPokemonByGeneration, getPokemonImage, getPokemon, Generation, generations } from '../utils/api'
+import { typeColors } from '../utils/typeColors'
 import TypeBadge from '../components/TypeBadge'
 import GenerationSelector from '../components/GenerationSelector'
 import Loading from '../components/Loading'
+import { useAuth } from '../context/AuthContext'
+import { getTeam, createTeam, updateTeam } from '../utils/authApi'
 
 const statNames: Record<string, string> = {
   hp: 'PV',
@@ -21,6 +24,30 @@ function TeamBuilder() {
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
   const [selectedGen, setSelectedGen] = useState<Generation | null>(generations[0])
+  const [teamName, setTeamName] = useState('')
+  const [saving, setSaving] = useState(false)
+  const [saveMessage, setSaveMessage] = useState('')
+  const [searchParams] = useSearchParams()
+  const navigate = useNavigate()
+  const { user } = useAuth()
+
+  const editingTeamId = searchParams.get('teamId')
+
+  // Load existing team if editing
+  useEffect(() => {
+    if (editingTeamId && user) {
+      getTeam(Number(editingTeamId))
+        .then(async (data) => {
+          setTeamName(data.team.name)
+          const ids: number[] = JSON.parse(data.team.pokemon_ids)
+          const pokemonData = await Promise.all(ids.map((id) => getPokemon(id)))
+          setTeam(pokemonData)
+        })
+        .catch(() => {
+          setSaveMessage('Equipe non trouvee')
+        })
+    }
+  }, [editingTeamId, user])
 
   const loadPokemon = (gen: Generation | null) => {
     setLoading(true)
@@ -53,6 +80,39 @@ function TeamBuilder() {
     setTeam(team.filter((p) => p.id !== pokemonId))
   }
 
+  const handleSave = async () => {
+    if (!user) {
+      navigate('/login')
+      return
+    }
+    if (!teamName.trim()) {
+      setSaveMessage('Donnez un nom a votre equipe')
+      return
+    }
+    if (team.length === 0) {
+      setSaveMessage('Ajoutez au moins un Pokemon')
+      return
+    }
+
+    setSaving(true)
+    setSaveMessage('')
+    try {
+      const pokemonIds = team.map((p) => p.id)
+      if (editingTeamId) {
+        await updateTeam(Number(editingTeamId), teamName.trim(), pokemonIds)
+        setSaveMessage('Equipe mise a jour !')
+      } else {
+        await createTeam(teamName.trim(), pokemonIds)
+        setSaveMessage('Equipe sauvegardee !')
+      }
+      setTimeout(() => navigate('/mes-equipes'), 1000)
+    } catch (err) {
+      setSaveMessage(err instanceof Error ? err.message : 'Erreur sauvegarde')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   const teamTypes = (() => {
     const types = new Set<string>()
     team.forEach((p) => p.types.forEach((t) => types.add(t.type.name)))
@@ -78,7 +138,7 @@ function TeamBuilder() {
   return (
     <div className="page">
       <div className="page-header">
-        <h1>Team Builder</h1>
+        <h1>{editingTeamId ? 'Modifier l\'equipe' : 'Team Builder'}</h1>
         <p>Construisez votre equipe de reve ({team.length}/6 Pokemon)</p>
       </div>
 
@@ -87,6 +147,26 @@ function TeamBuilder() {
       <div className="team-builder">
         <div>
           <h3 style={{ marginBottom: '1rem' }}>Votre Equipe</h3>
+
+          <div className="team-save-section">
+            <input
+              type="text"
+              className="search-input"
+              placeholder="Nom de l'equipe..."
+              value={teamName}
+              onChange={(e) => setTeamName(e.target.value)}
+              style={{ maxWidth: '100%', marginBottom: '0.5rem' }}
+            />
+            <button
+              className="team-save-btn"
+              onClick={handleSave}
+              disabled={saving}
+            >
+              {saving ? 'Sauvegarde...' : editingTeamId ? 'Mettre a jour' : 'Sauvegarder'}
+            </button>
+            {saveMessage && <p className="team-save-message">{saveMessage}</p>}
+          </div>
+
           <div className="team-slots">
             {Array.from({ length: 6 }).map((_, i) => {
               const pokemon = team[i]
