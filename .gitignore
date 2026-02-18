@@ -6,3 +6,6 @@ server/pokemon.db
 server/pokemon.db-shm
 server/pokemon.db-wal
 server/node_modules
+.env
+.env.local
+.vercel

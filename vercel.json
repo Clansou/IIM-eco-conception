@@ -1,0 +1,8 @@
+{
+  "buildCommand": "npm run build",
+  "outputDirectory": "dist",
+  "rewrites": [
+    { "source": "/api/teams/:id", "destination": "/api/teams/[id]" },
+    { "source": "/((?!api/).*)", "destination": "/index.html" }
+  ]
+}
