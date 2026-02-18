@@ -3,4 +3,6 @@ dist
 .DS_Store
 *.local
 server/pokemon.db
+server/pokemon.db-shm
+server/pokemon.db-wal
 server/node_modules
