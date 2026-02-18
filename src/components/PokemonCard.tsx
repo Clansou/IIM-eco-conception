@@ -20,7 +20,7 @@ function PokemonCard({ pokemon }: PokemonCardProps) {
         className="pokemon-card-image"
         src={getPokemonImage(pokemon)}
         alt={pokemon.name}
-        loading="lazy"
+        loading="eager"
       />
       <div className="pokemon-card-name">{pokemon.name}</div>
       <div className="pokemon-card-types">

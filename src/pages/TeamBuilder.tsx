@@ -1,8 +1,9 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect } from 'react'
 import { Pokemon, TypeName } from '../types/pokemon'
-import { getAllPokemon, getPokemonImage } from '../utils/api'
+import { getAllPokemonAllGens, getPokemonByGeneration, getPokemonImage, Generation, generations } from '../utils/api'
 import { typeColors, typeFrenchNames } from '../utils/typeColors'
 import TypeBadge from '../components/TypeBadge'
+import GenerationSelector from '../components/GenerationSelector'
 import Loading from '../components/Loading'
 
 const statNames: Record<string, string> = {
@@ -19,22 +20,28 @@ function TeamBuilder() {
   const [team, setTeam] = useState<Pokemon[]>([])
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
+  const [selectedGen, setSelectedGen] = useState<Generation | null>(generations[0])
 
-  useEffect(() => {
-    getAllPokemon(151).then((data) => {
+  const loadPokemon = (gen: Generation | null) => {
+    setLoading(true)
+    const fetcher = gen ? getPokemonByGeneration(gen) : getAllPokemonAllGens()
+    fetcher.then((data) => {
       setAllPokemon(data)
       setLoading(false)
     })
-  }, [])
+  }
 
-  const filteredPokemon = useMemo(() => {
-    if (!search) return allPokemon
-    return allPokemon.filter(
-      (p) =>
-        p.name.toLowerCase().includes(search.toLowerCase()) ||
-        String(p.id).includes(search)
-    )
-  }, [allPokemon, search])
+  useEffect(() => {
+    loadPokemon(selectedGen)
+  }, [selectedGen])
+
+  const filteredPokemon = !search
+    ? allPokemon
+    : allPokemon.filter(
+        (p) =>
+          p.name.toLowerCase().includes(search.toLowerCase()) ||
+          String(p.id).includes(search)
+      )
 
   const addToTeam = (pokemon: Pokemon) => {
     if (team.length >= 6) return
@@ -46,13 +53,13 @@ function TeamBuilder() {
     setTeam(team.filter((p) => p.id !== pokemonId))
   }
 
-  const teamTypes = useMemo(() => {
+  const teamTypes = (() => {
     const types = new Set<string>()
     team.forEach((p) => p.types.forEach((t) => types.add(t.type.name)))
     return Array.from(types)
-  }, [team])
+  })()
 
-  const averageStats = useMemo(() => {
+  const averageStats = (() => {
     if (team.length === 0) return null
     const statTotals: Record<string, number> = {}
     team.forEach((p) => {
@@ -64,7 +71,7 @@ function TeamBuilder() {
       name,
       value: Math.round(total / team.length),
     }))
-  }, [team])
+  })()
 
   if (loading) return <Loading text="Chargement des Pokemon..." />
 
@@ -74,6 +81,8 @@ function TeamBuilder() {
         <h1>Team Builder</h1>
         <p>Construisez votre equipe de reve ({team.length}/6 Pokemon)</p>
       </div>
+
+      <GenerationSelector selected={selectedGen} onChange={setSelectedGen} />
 
       <div className="team-builder">
         <div>
@@ -172,7 +181,7 @@ function TeamBuilder() {
                     cursor: isInTeam ? 'not-allowed' : 'pointer',
                   }}
                 >
-                  <img src={getPokemonImage(p)} alt={p.name} loading="lazy" />
+                  <img src={getPokemonImage(p)} alt={p.name} />
                   <p>{p.name}</p>
                 </div>
               )

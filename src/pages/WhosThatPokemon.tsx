@@ -1,15 +1,8 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Pokemon } from '../types/pokemon'
-import { getPokemon, getPokemonImage } from '../utils/api'
+import { getPokemon, getPokemonImage, getRandomPokemonIds, Generation } from '../utils/api'
+import GenerationSelector from '../components/GenerationSelector'
 import Loading from '../components/Loading'
-
-function getRandomIds(count: number, max: number): number[] {
-  const ids = new Set<number>()
-  while (ids.size < count) {
-    ids.add(Math.floor(Math.random() * max) + 1)
-  }
-  return Array.from(ids)
-}
 
 function WhosThatPokemon() {
   const [correctPokemon, setCorrectPokemon] = useState<Pokemon | null>(null)
@@ -21,24 +14,37 @@ function WhosThatPokemon() {
   const [streak, setStreak] = useState(0)
   const [bestStreak, setBestStreak] = useState(0)
   const [loading, setLoading] = useState(true)
+  const [selectedGen, setSelectedGen] = useState<Generation | null>(null)
+  const selectedGenRef = useRef<Generation | null>(null)
 
-  const loadRound = useCallback(async () => {
+  const handleGenChange = (gen: Generation | null) => {
+    setSelectedGen(gen)
+    selectedGenRef.current = gen
+    setScore(0)
+    setTotal(0)
+    setStreak(0)
+    setBestStreak(0)
+    loadRound(gen)
+  }
+
+  const loadRound = async (gen?: Generation | null) => {
     setLoading(true)
     setRevealed(false)
     setSelectedAnswer(null)
 
-    const ids = getRandomIds(4, 151)
+    const currentGen = gen !== undefined ? gen : selectedGenRef.current
+    const ids = getRandomPokemonIds(4, currentGen)
     const pokemons = await Promise.all(ids.map((id) => getPokemon(id)))
     const correctIndex = Math.floor(Math.random() * 4)
 
     setCorrectPokemon(pokemons[correctIndex])
     setChoices(pokemons.map((p) => p.name))
     setLoading(false)
-  }, [])
+  }
 
   useEffect(() => {
-    loadRound()
-  }, [loadRound])
+    loadRound(null)
+  }, [])
 
   const handleAnswer = (name: string) => {
     if (revealed) return
@@ -69,6 +75,8 @@ function WhosThatPokemon() {
           <h1>Qui est ce Pokemon ?</h1>
           <p>Devinez le Pokemon a partir de sa silhouette !</p>
         </div>
+
+        <GenerationSelector selected={selectedGen} onChange={handleGenChange} />
 
         <div className="quiz-streak">
           <div className="quiz-streak-item">
@@ -122,7 +130,7 @@ function WhosThatPokemon() {
         </div>
 
         {revealed && (
-          <button className="game-next-btn" onClick={loadRound}>
+          <button className="game-next-btn" onClick={() => loadRound()}>
             Pokemon suivant →
           </button>
         )}

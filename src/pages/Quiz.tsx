@@ -1,7 +1,8 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Pokemon, TypeName } from '../types/pokemon'
-import { getPokemon, getPokemonImage } from '../utils/api'
+import { getPokemon, getPokemonImage, getRandomPokemonId, Generation } from '../utils/api'
 import { typeColors, typeFrenchNames, typeEffectiveness, allTypes } from '../utils/typeColors'
+import GenerationSelector from '../components/GenerationSelector'
 import Loading from '../components/Loading'
 
 function shuffleArray<T>(array: T[]): T[] {
@@ -24,13 +25,26 @@ function Quiz() {
   const [bestStreak, setBestStreak] = useState(0)
   const [loading, setLoading] = useState(true)
   const [typeChoices, setTypeChoices] = useState<TypeName[]>([])
+  const [selectedGen, setSelectedGen] = useState<Generation | null>(null)
+  const selectedGenRef = useRef<Generation | null>(null)
 
-  const loadRound = useCallback(async () => {
+  const handleGenChange = (gen: Generation | null) => {
+    setSelectedGen(gen)
+    selectedGenRef.current = gen
+    setScore(0)
+    setTotal(0)
+    setStreak(0)
+    setBestStreak(0)
+    loadRound(gen)
+  }
+
+  const loadRound = async (gen?: Generation | null) => {
     setLoading(true)
     setRevealed(false)
     setSelectedType(null)
 
-    const id = Math.floor(Math.random() * 151) + 1
+    const currentGen = gen !== undefined ? gen : selectedGenRef.current
+    const id = getRandomPokemonId(currentGen)
     const pokemonData = await getPokemon(id)
     setPokemon(pokemonData)
 
@@ -45,11 +59,11 @@ function Quiz() {
     setTypeChoices(choices)
 
     setLoading(false)
-  }, [])
+  }
 
   useEffect(() => {
-    loadRound()
-  }, [loadRound])
+    loadRound(null)
+  }, [])
 
   const handleAnswer = (type: string) => {
     if (revealed) return
@@ -81,6 +95,8 @@ function Quiz() {
           <h1>Quiz des Types</h1>
           <p>Quel type est super efficace contre ce Pokemon ?</p>
         </div>
+
+        <GenerationSelector selected={selectedGen} onChange={handleGenChange} />
 
         <div className="quiz-streak">
           <div className="quiz-streak-item">
@@ -152,7 +168,7 @@ function Quiz() {
 
         {revealed && (
           <div style={{ marginTop: '1.5rem' }}>
-            <button className="game-next-btn" onClick={loadRound}>
+            <button className="game-next-btn" onClick={() => loadRound()}>
               Question suivante →
             </button>
           </div>

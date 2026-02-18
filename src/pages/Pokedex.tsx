@@ -1,8 +1,9 @@
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect } from 'react'
 import { Pokemon, TypeName } from '../types/pokemon'
-import { getAllPokemon } from '../utils/api'
+import { getAllPokemonAllGens, getPokemonByGeneration, Generation, generations } from '../utils/api'
 import { allTypes, typeColors, typeFrenchNames } from '../utils/typeColors'
 import PokemonCard from '../components/PokemonCard'
+import GenerationSelector from '../components/GenerationSelector'
 import Loading from '../components/Loading'
 
 function Pokedex() {
@@ -10,23 +11,28 @@ function Pokedex() {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [selectedType, setSelectedType] = useState<TypeName | null>(null)
+  const [selectedGen, setSelectedGen] = useState<Generation | null>(generations[0])
 
-  useEffect(() => {
-    getAllPokemon(151).then((data) => {
+  const loadPokemon = (gen: Generation | null) => {
+    setLoading(true)
+    const fetcher = gen ? getPokemonByGeneration(gen) : getAllPokemonAllGens()
+    fetcher.then((data) => {
       setPokemon(data)
       setLoading(false)
     })
-  }, [])
+  }
 
-  const filteredPokemon = useMemo(() => {
-    return pokemon.filter((p) => {
-      const matchesSearch = p.name.toLowerCase().includes(search.toLowerCase()) ||
-        String(p.id).includes(search)
-      const matchesType = !selectedType ||
-        p.types.some((t) => t.type.name === selectedType)
-      return matchesSearch && matchesType
-    })
-  }, [pokemon, search, selectedType])
+  useEffect(() => {
+    loadPokemon(selectedGen)
+  }, [selectedGen])
+
+  const filteredPokemon = pokemon.filter((p) => {
+    const matchesSearch = p.name.toLowerCase().includes(search.toLowerCase()) ||
+      String(p.id).includes(search)
+    const matchesType = !selectedType ||
+      p.types.some((t) => t.type.name === selectedType)
+    return matchesSearch && matchesType
+  })
 
   if (loading) return <Loading text="Chargement du Pokedex..." />
 
@@ -36,6 +42,8 @@ function Pokedex() {
         <h1>Pokedex</h1>
         <p>{filteredPokemon.length} Pokemon trouves</p>
       </div>
+
+      <GenerationSelector selected={selectedGen} onChange={setSelectedGen} />
 
       <div className="search-bar">
         <input
