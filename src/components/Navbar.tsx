@@ -11,7 +11,7 @@ function Navbar() {
   }
 
   return (
-    <nav className="navbar">
+    <nav className="navbar" aria-label="Navigation principale">
       <div className="navbar-inner">
         <NavLink to="/" className="navbar-logo">
           PokeApp
@@ -49,7 +49,7 @@ function Navbar() {
           {user ? (
             <>
               <span className="navbar-user">{user.email}</span>
-              <button className="navbar-logout" onClick={handleLogout}>
+              <button className="navbar-logout" onClick={handleLogout} type="button">
                 Deconnexion
               </button>
             </>

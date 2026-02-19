@@ -1,15 +1,15 @@
 import { useState, useEffect, useRef } from 'react'
 import { Pokemon, TypeName } from '../types/pokemon'
 import { getPokemon, getPokemonImage, getRandomPokemonId, Generation } from '../utils/api'
-import { typeColors, typeFrenchNames, typeEffectiveness, allTypes } from '../utils/typeColors'
+import { getContrastTextColor, typeColors, typeFrenchNames, typeEffectiveness, allTypes } from '../utils/typeColors'
 import GenerationSelector from '../components/GenerationSelector'
 import Loading from '../components/Loading'
 
 function shuffleArray<T>(array: T[]): T[] {
   const shuffled = [...array]
   for (let i = shuffled.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
+    const j = Math.floor(Math.random() * (i + 1))
+    ;[shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]]
   }
   return shuffled
 }
@@ -87,6 +87,8 @@ function Quiz() {
 
   const isCorrect = selectedType && correctTypes.includes(selectedType)
   const primaryType = pokemon.types[0].type.name as TypeName
+  const primaryColor = typeColors[primaryType]
+  const primaryText = getContrastTextColor(primaryColor)
 
   return (
     <div className="page">
@@ -116,18 +118,25 @@ function Quiz() {
         <div className="quiz-question">
           <h2>
             Quel type est <span style={{ color: '#e94560' }}>super efficace</span> contre un
-            Pokemon de type <span style={{ color: typeColors[primaryType] }}>
+            Pokemon de type <span style={{ color: primaryColor }}>
               {typeFrenchNames[primaryType]}
             </span> ?
           </h2>
 
           <div className="quiz-pokemon-display">
-            <img src={getPokemonImage(pokemon)} alt={pokemon.name} />
+            <img
+              src={getPokemonImage(pokemon)}
+              alt=""
+              aria-hidden="true"
+              decoding="async"
+              width={120}
+              height={120}
+            />
             <div>
-              <div className="pokemon-name">{pokemon.name}</div>
+              <div className="pokemon-name" lang="en">{pokemon.name}</div>
               <span
                 className="type-badge"
-                style={{ backgroundColor: typeColors[primaryType] }}
+                style={{ backgroundColor: primaryColor, color: primaryText }}
               >
                 {typeFrenchNames[primaryType]}
               </span>
@@ -135,15 +144,17 @@ function Quiz() {
           </div>
         </div>
 
-        {revealed && (
-          <p className={`game-result ${isCorrect ? 'correct' : 'wrong'}`}>
-            {isCorrect
-              ? 'Excellent ! Bonne reponse !'
-              : `Rate ! Les bonnes reponses etaient : ${correctTypes
-                  .map((t) => typeFrenchNames[t as TypeName])
-                  .join(', ')}`}
-          </p>
-        )}
+        <div aria-live="polite" aria-atomic="true">
+          {revealed && (
+            <p className={`game-result ${isCorrect ? 'correct' : 'wrong'}`} role="status">
+              {isCorrect
+                ? 'Excellent ! Bonne reponse !'
+                : `Rate ! Les bonnes reponses etaient : ${correctTypes
+                    .map((t) => typeFrenchNames[t as TypeName])
+                    .join(', ')}`}
+            </p>
+          )}
+        </div>
 
         <div className="quiz-type-choices">
           {typeChoices.map((type) => {
@@ -152,13 +163,15 @@ function Quiz() {
               if (correctTypes.includes(type)) className += ' correct'
               else if (type === selectedType) className += ' wrong'
             }
+            const bg = typeColors[type]
             return (
               <button
                 key={type}
                 className={className}
-                style={{ backgroundColor: typeColors[type] }}
+                style={{ backgroundColor: bg, color: getContrastTextColor(bg) }}
                 onClick={() => handleAnswer(type)}
                 disabled={revealed}
+                type="button"
               >
                 {typeFrenchNames[type]}
               </button>
@@ -168,7 +181,7 @@ function Quiz() {
 
         {revealed && (
           <div style={{ marginTop: '1.5rem' }}>
-            <button className="game-next-btn" onClick={() => loadRound()}>
+            <button className="game-next-btn" onClick={() => loadRound()} type="button">
               Question suivante →
             </button>
           </div>

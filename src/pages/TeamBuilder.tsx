@@ -1,13 +1,16 @@
-import { useState, useEffect } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams, useNavigate } from 'react-router-dom'
 import { Pokemon, TypeName } from '../types/pokemon'
-import { getAllPokemonAllGens, getPokemonByGeneration, getPokemonImage, getPokemon, Generation, generations } from '../utils/api'
+import { getPokemonPage, getPokemonThumbnail, getPokemon, Generation, generations } from '../utils/api'
 import { typeColors } from '../utils/typeColors'
 import TypeBadge from '../components/TypeBadge'
 import GenerationSelector from '../components/GenerationSelector'
 import Loading from '../components/Loading'
 import { useAuth } from '../context/AuthContext'
 import { getTeam, createTeam, updateTeam } from '../utils/authApi'
+import { useDebouncedValue } from '../hooks/useDebouncedValue'
+
+const PAGE_SIZE = 30
 
 const statNames: Record<string, string> = {
   hp: 'PV',
@@ -19,19 +22,25 @@ const statNames: Record<string, string> = {
 }
 
 function TeamBuilder() {
-  const [allPokemon, setAllPokemon] = useState<Pokemon[]>([])
+  const [searchResults, setSearchResults] = useState<Pokemon[]>([])
   const [team, setTeam] = useState<Pokemon[]>([])
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [error, setError] = useState('')
   const [selectedGen, setSelectedGen] = useState<Generation | null>(generations[0])
   const [teamName, setTeamName] = useState('')
   const [saving, setSaving] = useState(false)
   const [saveMessage, setSaveMessage] = useState('')
+  const [page, setPage] = useState(1)
+  const [hasMore, setHasMore] = useState(true)
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
   const { user } = useAuth()
+  const abortRef = useRef<AbortController | null>(null)
 
   const editingTeamId = searchParams.get('teamId')
+  const debouncedSearch = useDebouncedValue(search.trim(), 300)
 
   // Load existing team if editing
   useEffect(() => {
@@ -49,35 +58,57 @@ function TeamBuilder() {
     }
   }, [editingTeamId, user])
 
-  const loadPokemon = (gen: Generation | null) => {
-    setLoading(true)
-    const fetcher = gen ? getPokemonByGeneration(gen) : getAllPokemonAllGens()
-    fetcher.then((data) => {
-      setAllPokemon(data)
+  const loadPage = async (pageToLoad: number, replace: boolean) => {
+    if (abortRef.current) abortRef.current.abort()
+    const controller = new AbortController()
+    abortRef.current = controller
+    const isCurrent = () => abortRef.current === controller
+
+    setError('')
+    if (replace) setLoading(true)
+    else setLoadingMore(true)
+
+    try {
+      const data = await getPokemonPage({
+        gen: selectedGen,
+        page: pageToLoad,
+        limit: PAGE_SIZE,
+        search: debouncedSearch,
+        signal: controller.signal,
+      })
+
+      setSearchResults((prev) => (replace ? data.results : [...prev, ...data.results]))
+      setHasMore(pageToLoad * PAGE_SIZE < data.count)
+      setPage(pageToLoad)
+    } catch (err) {
+      if (err instanceof Error && err.name === 'AbortError') return
+      setError(err instanceof Error ? err.message : 'Erreur chargement')
+    } finally {
+      if (!isCurrent()) return
       setLoading(false)
-    })
+      setLoadingMore(false)
+    }
   }
 
   useEffect(() => {
-    loadPokemon(selectedGen)
-  }, [selectedGen])
+    setSearchResults([])
+    setHasMore(true)
+    setPage(1)
+    loadPage(1, true)
 
-  const filteredPokemon = !search
-    ? allPokemon
-    : allPokemon.filter(
-        (p) =>
-          p.name.toLowerCase().includes(search.toLowerCase()) ||
-          String(p.id).includes(search)
-      )
+    return () => {
+      abortRef.current?.abort()
+    }
+  }, [selectedGen, debouncedSearch])
 
   const addToTeam = (pokemon: Pokemon) => {
     if (team.length >= 6) return
     if (team.some((p) => p.id === pokemon.id)) return
-    setTeam([...team, pokemon])
+    setTeam((prev) => [...prev, pokemon])
   }
 
   const removeFromTeam = (pokemonId: number) => {
-    setTeam(team.filter((p) => p.id !== pokemonId))
+    setTeam((prev) => prev.filter((p) => p.id !== pokemonId))
   }
 
   const handleSave = async () => {
@@ -113,13 +144,13 @@ function TeamBuilder() {
     }
   }
 
-  const teamTypes = (() => {
+  const teamTypes = useMemo(() => {
     const types = new Set<string>()
     team.forEach((p) => p.types.forEach((t) => types.add(t.type.name)))
     return Array.from(types)
-  })()
+  }, [team])
 
-  const averageStats = (() => {
+  const averageStats = useMemo(() => {
     if (team.length === 0) return null
     const statTotals: Record<string, number> = {}
     team.forEach((p) => {
@@ -131,14 +162,14 @@ function TeamBuilder() {
       name,
       value: Math.round(total / team.length),
     }))
-  })()
+  }, [team])
 
-  if (loading) return <Loading text="Chargement des Pokemon..." />
+  if (loading && searchResults.length === 0) return <Loading text="Chargement des Pokemon..." />
 
   return (
     <div className="page">
       <div className="page-header">
-        <h1>{editingTeamId ? 'Modifier l\'equipe' : 'Team Builder'}</h1>
+        <h1>{editingTeamId ? "Modifier l'equipe" : 'Team Builder'}</h1>
         <p>Construisez votre equipe de reve ({team.length}/6 Pokemon)</p>
       </div>
 
@@ -149,7 +180,9 @@ function TeamBuilder() {
           <h3 style={{ marginBottom: '1rem' }}>Votre Equipe</h3>
 
           <div className="team-save-section">
+            <label htmlFor="team-name" className="sr-only">Nom de l'equipe</label>
             <input
+              id="team-name"
               type="text"
               className="search-input"
               placeholder="Nom de l'equipe..."
@@ -161,10 +194,15 @@ function TeamBuilder() {
               className="team-save-btn"
               onClick={handleSave}
               disabled={saving}
+              type="button"
             >
               {saving ? 'Sauvegarde...' : editingTeamId ? 'Mettre a jour' : 'Sauvegarder'}
             </button>
-            {saveMessage && <p className="team-save-message">{saveMessage}</p>}
+            {saveMessage && (
+              <p className="team-save-message" role="status" aria-live="polite">
+                {saveMessage}
+              </p>
+            )}
           </div>
 
           <div className="team-slots">
@@ -177,11 +215,21 @@ function TeamBuilder() {
                       <button
                         className="team-slot-remove"
                         onClick={() => removeFromTeam(pokemon.id)}
+                        aria-label={`Retirer ${pokemon.name} de l'equipe`}
+                        type="button"
                       >
                         X
                       </button>
-                      <img src={getPokemonImage(pokemon)} alt={pokemon.name} />
-                      <p className="pokemon-name">{pokemon.name}</p>
+                      <img
+                        src={getPokemonThumbnail(pokemon)}
+                        alt=""
+                        aria-hidden="true"
+                        loading="lazy"
+                        decoding="async"
+                        width={70}
+                        height={70}
+                      />
+                      <p className="pokemon-name" lang="en">{pokemon.name}</p>
                       <div style={{ display: 'flex', gap: '0.2rem', marginTop: '0.3rem' }}>
                         {pokemon.types.map((t) => (
                           <span
@@ -237,36 +285,75 @@ function TeamBuilder() {
         </div>
 
         <div className="team-search">
+          <label htmlFor="team-search" className="sr-only">Rechercher un Pokemon</label>
           <input
+            id="team-search"
             type="text"
             className="search-input"
             placeholder="Rechercher un Pokemon..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             style={{ maxWidth: '100%', marginBottom: '0.5rem' }}
+            aria-describedby="team-search-help"
           />
-          <p style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}>
+          <p
+            id="team-search-help"
+            style={{ fontSize: '0.8rem', color: 'var(--text-secondary)', marginBottom: '0.5rem' }}
+          >
             Cliquez sur un Pokemon pour l'ajouter a votre equipe
           </p>
-          <div className="team-search-results">
-            {filteredPokemon.map((p) => {
+
+          {error && (
+            <div className="error-message" role="alert">
+              {error}
+            </div>
+          )}
+
+          <div className="team-search-results" aria-live="polite">
+            {searchResults.map((p) => {
               const isInTeam = team.some((t) => t.id === p.id)
               return (
-                <div
+                <button
                   key={p.id}
                   className="team-search-item"
                   onClick={() => !isInTeam && addToTeam(p)}
+                  disabled={isInTeam}
+                  type="button"
                   style={{
                     opacity: isInTeam ? 0.3 : 1,
                     cursor: isInTeam ? 'not-allowed' : 'pointer',
                   }}
                 >
-                  <img src={getPokemonImage(p)} alt={p.name} />
-                  <p>{p.name}</p>
-                </div>
+                  <img
+                    src={getPokemonThumbnail(p)}
+                    alt=""
+                    aria-hidden="true"
+                    loading="lazy"
+                    decoding="async"
+                    width={50}
+                    height={50}
+                  />
+                  <p lang="en">{p.name}</p>
+                </button>
               )
             })}
           </div>
+          {!loading && searchResults.length === 0 && !error && (
+            <p className="loading-text" role="status">Aucun Pokemon trouve</p>
+          )}
+
+          {hasMore && !error && searchResults.length > 0 && (
+            <div className="load-more">
+              <button
+                className="load-more-btn"
+                onClick={() => loadPage(page + 1, false)}
+                disabled={loadingMore}
+                type="button"
+              >
+                {loadingMore ? 'Chargement...' : 'Charger plus'}
+              </button>
+            </div>
+          )}
         </div>
       </div>
     </div>
