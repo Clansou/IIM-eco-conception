@@ -99,15 +99,20 @@ function WhosThatPokemon() {
               className={`game-image ${revealed ? 'revealed' : 'silhouette'}`}
               src={getPokemonImage(correctPokemon)}
               alt="Pokemon mystere"
+              decoding="async"
+              width={180}
+              height={180}
             />
           )}
         </div>
 
-        {revealed && (
-          <p className={`game-result ${isCorrect ? 'correct' : 'wrong'}`}>
-            {isCorrect ? 'Bien joue !' : `C'etait ${correctPokemon?.name} !`}
-          </p>
-        )}
+        <div aria-live="polite" aria-atomic="true">
+          {revealed && (
+            <p className={`game-result ${isCorrect ? 'correct' : 'wrong'}`} role="status">
+              {isCorrect ? 'Bien joue !' : `C'etait ${correctPokemon?.name} !`}
+            </p>
+          )}
+        </div>
 
         <div className="game-choices">
           {choices.map((name) => {
@@ -122,6 +127,8 @@ function WhosThatPokemon() {
                 className={className}
                 onClick={() => handleAnswer(name)}
                 disabled={revealed}
+                type="button"
+                lang="en"
               >
                 {name}
               </button>
@@ -130,7 +137,7 @@ function WhosThatPokemon() {
         </div>
 
         {revealed && (
-          <button className="game-next-btn" onClick={() => loadRound()}>
+          <button className="game-next-btn" onClick={() => loadRound()} type="button">
             Pokemon suivant →
           </button>
         )}

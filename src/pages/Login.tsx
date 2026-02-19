@@ -35,7 +35,7 @@ function Login() {
       <div className="auth-container">
         <h1>{isRegister ? 'Inscription' : 'Connexion'}</h1>
         <form className="auth-form" onSubmit={handleSubmit}>
-          {error && <div className="auth-error">{error}</div>}
+          {error && <div className="auth-error" role="alert">{error}</div>}
           <div className="auth-field">
             <label htmlFor="email">Email</label>
             <input
@@ -65,7 +65,7 @@ function Login() {
         </form>
         <p className="auth-toggle">
           {isRegister ? 'Deja un compte ?' : 'Pas encore de compte ?'}{' '}
-          <button onClick={() => { setIsRegister(!isRegister); setError('') }}>
+          <button type="button" onClick={() => { setIsRegister(!isRegister); setError('') }}>
             {isRegister ? 'Se connecter' : "S'inscrire"}
           </button>
         </p>

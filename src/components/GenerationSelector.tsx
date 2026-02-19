@@ -1,3 +1,4 @@
+import { memo } from 'react'
 import { Generation, generations } from '../utils/api'
 
 interface GenerationSelectorProps {
@@ -7,10 +8,12 @@ interface GenerationSelectorProps {
 
 function GenerationSelector({ selected, onChange }: GenerationSelectorProps) {
   return (
-    <div className="generation-selector">
+    <div className="generation-selector" aria-label="Selection de generation">
       <button
         className={`gen-btn ${selected === null ? 'active' : ''}`}
         onClick={() => onChange(null)}
+        aria-pressed={selected === null}
+        type="button"
       >
         <span className="gen-btn-name">Toutes</span>
         <span className="gen-btn-count">1025</span>
@@ -20,6 +23,8 @@ function GenerationSelector({ selected, onChange }: GenerationSelectorProps) {
           key={gen.id}
           className={`gen-btn ${selected?.id === gen.id ? 'active' : ''}`}
           onClick={() => onChange(gen)}
+          aria-pressed={selected?.id === gen.id}
+          type="button"
         >
           <span className="gen-btn-name">{gen.region}</span>
           <span className="gen-btn-count">Gen {gen.id}</span>
@@ -29,4 +34,4 @@ function GenerationSelector({ selected, onChange }: GenerationSelectorProps) {
   )
 }
 
-export default GenerationSelector
+export default memo(GenerationSelector)

@@ -15,7 +15,6 @@ export interface Pokemon {
   types: PokemonType[];
   stats: PokemonStat[];
   abilities: PokemonAbility[];
-  moves: PokemonMove[];
   height: number;
   weight: number;
   base_experience: number;
@@ -46,11 +45,6 @@ export interface PokemonAbility {
   is_hidden: boolean;
 }
 
-export interface PokemonMove {
-  move: {
-    name: string;
-  };
-}
 
 export interface PokemonSpecies {
   evolution_chain: {
@@ -103,6 +97,11 @@ export interface PokemonListResponse {
     name: string;
     url: string;
   }[];
+}
+
+export interface PokemonPageResponse {
+  count: number;
+  results: Pokemon[];
 }
 
 export type TypeName =

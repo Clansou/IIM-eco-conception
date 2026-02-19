@@ -1,5 +1,6 @@
 const express = require('express')
 const cors = require('cors')
+const pokeRoutes = require('./routes/poke')
 const authRoutes = require('./routes/auth')
 const teamsRoutes = require('./routes/teams')
 
@@ -10,6 +11,7 @@ app.use(cors())
 app.use(express.json())
 
 // Routes
+app.use('/api', pokeRoutes)
 app.use('/api/auth', authRoutes)
 app.use('/api/teams', teamsRoutes)
 

@@ -1,15 +1,18 @@
 import { TypeName } from '../types/pokemon'
-import { typeColors, typeFrenchNames } from '../utils/typeColors'
+import { getContrastTextColor, typeColors, typeFrenchNames } from '../utils/typeColors'
 
 interface TypeBadgeProps {
-  type: TypeName;
+  type: TypeName
 }
 
 function TypeBadge({ type }: TypeBadgeProps) {
+  const background = typeColors[type] || '#777'
+  const color = getContrastTextColor(background)
+
   return (
     <span
       className="type-badge"
-      style={{ backgroundColor: typeColors[type] || '#777' }}
+      style={{ backgroundColor: background, color }}
     >
       {typeFrenchNames[type] || type}
     </span>

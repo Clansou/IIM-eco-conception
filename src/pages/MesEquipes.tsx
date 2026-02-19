@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { Team } from '../types/auth'
 import { Pokemon } from '../types/pokemon'
 import { getTeams, deleteTeam } from '../utils/authApi'
-import { getPokemon, getPokemonImage } from '../utils/api'
+import { getPokemon, getPokemonThumbnail } from '../utils/api'
 import Loading from '../components/Loading'
 
 interface TeamWithSprites extends Team {
@@ -57,12 +57,12 @@ function MesEquipes() {
         <p>Gerez vos equipes sauvegardees</p>
       </div>
 
-      {error && <div className="auth-error" style={{ marginBottom: '1rem' }}>{error}</div>}
+      {error && <div className="auth-error" style={{ marginBottom: '1rem' }} role="alert">{error}</div>}
 
       {teams.length === 0 ? (
         <div className="teams-empty">
           <p>Vous n'avez pas encore d'equipe sauvegardee.</p>
-          <button className="auth-submit" onClick={() => navigate('/team-builder')}>
+          <button className="auth-submit" onClick={() => navigate('/team-builder')} type="button">
             Creer une equipe
           </button>
         </div>
@@ -73,19 +73,30 @@ function MesEquipes() {
               <h3 className="team-card-name">{team.name}</h3>
               <div className="team-card-sprites">
                 {team.pokemonData?.map((p) => (
-                  <img key={p.id} src={getPokemonImage(p)} alt={p.name} title={p.name} />
+                  <img
+                    key={p.id}
+                    src={getPokemonThumbnail(p)}
+                    alt={p.name}
+                    title={p.name}
+                    loading="lazy"
+                    decoding="async"
+                    width={56}
+                    height={56}
+                  />
                 ))}
               </div>
               <div className="team-card-actions">
                 <button
                   className="team-card-edit"
                   onClick={() => navigate(`/team-builder?teamId=${team.id}`)}
+                  type="button"
                 >
                   Modifier
                 </button>
                 <button
                   className="team-card-delete"
                   onClick={() => handleDelete(team.id)}
+                  type="button"
                 >
                   Supprimer
                 </button>

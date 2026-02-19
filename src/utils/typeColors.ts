@@ -21,26 +21,31 @@ export const typeColors: Record<TypeName, string> = {
   fairy: '#D685AD',
 };
 
-export const typeEmojis: Record<TypeName, string> = {
-  normal: '⚪',
-  fire: '🔥',
-  water: '💧',
-  electric: '⚡',
-  grass: '🌿',
-  ice: '❄️',
-  fighting: '🥊',
-  poison: '☠️',
-  ground: '🌍',
-  flying: '🦅',
-  psychic: '🔮',
-  bug: '🐛',
-  rock: '🪨',
-  ghost: '👻',
-  dragon: '🐉',
-  dark: '🌑',
-  steel: '⚙️',
-  fairy: '🧚',
-};
+function hexToRgb(hex: string): { r: number; g: number; b: number } {
+  const clean = hex.replace('#', '');
+  if (clean.length !== 6) return { r: 0, g: 0, b: 0 };
+  const r = parseInt(clean.slice(0, 2), 16);
+  const g = parseInt(clean.slice(2, 4), 16);
+  const b = parseInt(clean.slice(4, 6), 16);
+  return { r, g, b };
+}
+
+function srgbToLinear(channel: number): number {
+  const c = channel / 255;
+  return c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4);
+}
+
+export function getContrastTextColor(hex: string): string {
+  const { r, g, b } = hexToRgb(hex);
+  const luminance = 0.2126 * srgbToLinear(r) + 0.7152 * srgbToLinear(g) + 0.0722 * srgbToLinear(b);
+  const whiteLuminance = 1;
+  const black = hexToRgb('#111111');
+  const blackLuminance = 0.2126 * srgbToLinear(black.r) + 0.7152 * srgbToLinear(black.g) + 0.0722 * srgbToLinear(black.b);
+  const contrast = (a: number, b: number) => (Math.max(a, b) + 0.05) / (Math.min(a, b) + 0.05);
+  const contrastWithWhite = contrast(luminance, whiteLuminance);
+  const contrastWithBlack = contrast(luminance, blackLuminance);
+  return contrastWithWhite >= contrastWithBlack ? '#fff' : '#111';
+}
 
 export const typeEffectiveness: Record<string, string[]> = {
   normal: ['fighting'],

@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
-import { Pokemon, PokemonSpecies, EvolutionChain, EvolutionLink, TypeName } from '../types/pokemon'
-import { getPokemon, getPokemonSpecies, getEvolutionChain, getPokemonImage, getPokemonIdFromUrl } from '../utils/api'
+import { useEffect, useRef, useState } from 'react'
+import { Link, useNavigate, useParams } from 'react-router-dom'
+import { Pokemon, PokemonSpecies, EvolutionLink, TypeName } from '../types/pokemon'
+import { getPokemon, getPokemonSpecies, getEvolutionChain, getPokemonImage, getPokemonThumbnail, getPokemonIdFromUrl } from '../utils/api'
 import TypeBadge from '../components/TypeBadge'
 import Loading from '../components/Loading'
 
@@ -21,33 +21,63 @@ function PokemonDetail() {
   const [species, setSpecies] = useState<PokemonSpecies | null>(null)
   const [evolutions, setEvolutions] = useState<{ name: string; id: number; sprite: string }[]>([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const abortRef = useRef<AbortController | null>(null)
 
   useEffect(() => {
     if (!id) return
-    setLoading(true)
 
-    Promise.all([
-      getPokemon(id),
-      getPokemonSpecies(id),
-    ]).then(async ([pokemonData, speciesData]) => {
-      setPokemon(pokemonData)
-      setSpecies(speciesData)
+    if (abortRef.current) abortRef.current.abort()
+    const controller = new AbortController()
+    abortRef.current = controller
+    let cancelled = false
 
-      const evoChain = await getEvolutionChain(speciesData.evolution_chain.url)
-      const evoList = extractEvolutions(evoChain.chain)
+    const loadDetails = async () => {
+      setLoading(true)
+      setError('')
+      setPokemon(null)
+      setSpecies(null)
+      setEvolutions([])
+      try {
+        const [pokemonData, speciesData] = await Promise.all([
+          getPokemon(id, controller.signal),
+          getPokemonSpecies(id, controller.signal),
+        ])
 
-      const evosWithSprites = await Promise.all(
-        evoList.map(async (evo) => {
-          const p = await getPokemon(evo.id)
-          return {
-            ...evo,
-            sprite: getPokemonImage(p),
-          }
-        })
-      )
-      setEvolutions(evosWithSprites)
-      setLoading(false)
-    })
+        if (cancelled) return
+        setPokemon(pokemonData)
+        setSpecies(speciesData)
+
+        const evoChain = await getEvolutionChain(speciesData.evolution_chain.url, controller.signal)
+        if (cancelled) return
+
+        const evoList = extractEvolutions(evoChain.chain)
+        const evosWithSprites = await Promise.all(
+          evoList.map(async (evo) => {
+            const p = await getPokemon(evo.id, controller.signal)
+            return {
+              ...evo,
+              sprite: getPokemonThumbnail(p),
+            }
+          })
+        )
+
+        if (cancelled) return
+        setEvolutions(evosWithSprites)
+      } catch (err) {
+        if (err instanceof Error && err.name === 'AbortError') return
+        setError(err instanceof Error ? err.message : 'Erreur chargement')
+      } finally {
+        if (!cancelled) setLoading(false)
+      }
+    }
+
+    loadDetails()
+
+    return () => {
+      cancelled = true
+      controller.abort()
+    }
   }, [id])
 
   function extractEvolutions(chain: EvolutionLink): { name: string; id: number }[] {
@@ -65,7 +95,21 @@ function PokemonDetail() {
     return result
   }
 
-  if (loading || !pokemon || !species) return <Loading text="Chargement..." />
+  if (loading) return <Loading text="Chargement..." />
+  if (!pokemon || !species) {
+    return (
+      <div className="page">
+        <div className="detail-container">
+          <button className="back-button" onClick={() => navigate(-1)} type="button">
+            ← Retour
+          </button>
+          <div className="error-message" role="alert">
+            {error || 'Pokemon introuvable'}
+          </div>
+        </div>
+      </div>
+    )
+  }
 
   const description = species.flavor_text_entries.find(
     (e) => e.language.name === 'fr'
@@ -84,18 +128,27 @@ function PokemonDetail() {
   return (
     <div className="page">
       <div className="detail-container">
-        <button className="back-button" onClick={() => navigate(-1)}>
+        <button className="back-button" onClick={() => navigate(-1)} type="button">
           ← Retour
         </button>
+
+        {error && (
+          <div className="error-message" role="alert">
+            {error}
+          </div>
+        )}
 
         <div className="detail-header">
           <img
             className="detail-image"
             src={getPokemonImage(pokemon)}
             alt={pokemon.name}
+            decoding="async"
+            width={280}
+            height={280}
           />
           <p className="detail-id">#{String(pokemon.id).padStart(3, '0')}</p>
-          <h1 className="detail-name">{pokemon.name}</h1>
+          <h1 className="detail-name" lang="en">{pokemon.name}</h1>
           <p style={{ color: 'var(--text-secondary)', fontStyle: 'italic' }}>{genus}</p>
           <div className="detail-types">
             {pokemon.types.map((t) => (
@@ -173,13 +226,13 @@ function PokemonDetail() {
               {evolutions.map((evo, index) => (
                 <div key={evo.id} style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
                   {index > 0 && <span className="evolution-arrow">→</span>}
-                  <div
+                  <Link
                     className="evolution-pokemon"
-                    onClick={() => navigate(`/pokemon/${evo.id}`)}
+                    to={`/pokemon/${evo.id}`}
                   >
-                    <img src={evo.sprite} alt={evo.name} />
-                    <p>{evo.name}</p>
-                  </div>
+                    <img src={evo.sprite} alt="" aria-hidden="true" loading="lazy" decoding="async" width={80} height={80} />
+                    <p lang="en">{evo.name}</p>
+                  </Link>
                 </div>
               ))}
             </div>
